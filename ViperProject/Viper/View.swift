@@ -15,120 +15,117 @@ protocol AnyView {
     func update(with error: String)
 }
 
-// SwiftUI implementation of the View
+/// SwiftUI View that conforms to AnyView protocol in VIPER architecture
 struct UserListView: View, AnyView {
-    var presenter: AnyPresenter?
+    // ViewModel to handle state and data presentation
+    @ObservedObject private var viewModel = UserViewModel()
     
-    // Changed to @Binding to receive updates from UIHostingController
-    @Binding var users: [User]
-    @Binding var errorMessage: String
-    @Binding var showError: Bool
+    // Presenter property that will be set by the router
+    var presenter: AnyPresenter? {
+        didSet {
+            // When presenter is set, pass it to the view model
+            viewModel.presenter = presenter
+        }
+    }
+    
+    // State property to force view updates when data changes
+    @State private var refreshID = UUID()
     
     var body: some View {
         NavigationView {
-            Group {
-                if users.isEmpty && !showError {
+            VStack {
+                // Main content based on loading state
+                if viewModel.isLoading && viewModel.users.isEmpty {
+                    Spacer()
                     ProgressView("Loading users...")
-                } else if showError {
+                    Spacer()
+                } else if viewModel.showError {
+                    Spacer()
                     VStack {
-                        Text(errorMessage)
+                        Text(viewModel.errorMessage)
                             .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        
                         Button("Retry") {
-                            presenter?.interactor?.getUSers()
+                            viewModel.fetchUsers()
                         }
                         .padding()
                         .background(Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                     }
+                    Spacer()
                 } else {
-                    List {
-                        ForEach(users) { user in
-                            Text(user.name)
-                                .padding()
+                    // User list 
+                    if viewModel.users.isEmpty {
+                        Spacer()
+                        Text("No users found")
+                            .foregroundColor(.gray)
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            LazyVStack(alignment: .leading) {
+                                ForEach(viewModel.users) { user in
+                                    HStack {
+                                        Text(user.name)
+                                            .font(.headline)
+                                        Spacer()
+                                    }
+                                    .padding()
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(8)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 4)
+                                }
+                            }
                         }
                     }
                 }
             }
+            .id(refreshID) // Force view to refresh when this changes
             .navigationTitle("Users")
         }
         .onAppear {
-            presenter?.interactor?.getUSers()
+            // Ensure presenter is connected
+            if viewModel.presenter == nil {
+                viewModel.presenter = presenter
+            }
+            
+            // Fetch data when view appears
+            viewModel.fetchUsers()
         }
     }
     
-    // These methods are only needed for protocol conformance
-    // The actual updates happen via @Binding
+    // MARK: - AnyView Protocol Implementation
+    
+    /// Updates the view with fetched users
     func update(with users: [User]) {
-        // Implementation needed for protocol conformance
-        // Actual updates come through @Binding
-    }
-    
-    func update(with error: String) {
-        // Implementation needed for protocol conformance
-        // Actual updates come through @Binding
-    }
-}
-
-// UIHostingController to bridge SwiftUI and UIKit for VIPER architecture
-class UserViewController: UIHostingController<UserListView>, AnyView {
-    var presenter: AnyPresenter?
-    
-    // State that will be passed to the SwiftUI view
-    private var users: [User] = [] {
-        didSet { updateView() }
-    }
-    private var errorMessage: String = "" {
-        didSet { updateView() }
-    }
-    private var showError: Bool = false {
-        didSet { updateView() }
-    }
-    
-    init() {
-        // Create state objects for the bindings
-        let rootView = UserListView(
-            presenter: nil,
-            users: .constant([]),
-            errorMessage: .constant(""),
-            showError: .constant(false)
-        )
-        super.init(rootView: rootView)
-        updateView()
-    }
-    
-    @MainActor required dynamic init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    // Update the SwiftUI view with current state
-    private func updateView() {
-        // This ensures our SwiftUI view gets the latest state
-        rootView = UserListView(
-            presenter: presenter,
-            users: .constant(users),
-            errorMessage: .constant(errorMessage),
-            showError: .constant(showError)
-        )
-    }
-    
-    // AnyView protocol implementation
-    func update(with users: [User]) {
-        print("Received users in ViewController: \(users.count)")
-        // Update on main thread and trigger view refresh
         DispatchQueue.main.async {
-            self.users = users
-            self.showError = false
+            self.viewModel.users = users
+            self.viewModel.isLoading = false
+            self.viewModel.showError = false
+            
+            // Force view to refresh
+            self.refreshID = UUID()
         }
     }
     
+    /// Updates the view with an error message
     func update(with error: String) {
-        print("Received error in ViewController: \(error)")
-        // Update on main thread and trigger view refresh
         DispatchQueue.main.async {
-            self.errorMessage = error
-            self.showError = true
+            self.viewModel.errorMessage = error
+            self.viewModel.isLoading = false
+            self.viewModel.showError = true
+            
+            // Force view to refresh
+            self.refreshID = UUID()
         }
+    }
+    
+    /// Public method to trigger data fetch from outside the view
+    func fetchData() {
+        viewModel.fetchUsers()
     }
 }
 

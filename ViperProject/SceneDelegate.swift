@@ -17,9 +17,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         guard let windowScene = (scene as? UIWindowScene) else { return }
         
+        // Initialize VIPER architecture
         let userRouter = UserRouter.start()
         let initialVC = userRouter.entry
         
+        // Set up window with the root view controller
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = initialVC
         self.window = window

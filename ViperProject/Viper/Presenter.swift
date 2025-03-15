@@ -20,22 +20,33 @@ class UserPresenter: AnyPresenter {
     
     var interactor: AnyInteractor? {
         didSet {
-            interactor?.getUSers()
+            // Don't automatically fetch users here as it can cause timing issues
+            // Let the view trigger the fetch when it's ready
         }
     }
     
     var view: AnyView?
     
     func interactorDidfetchUsers(with result: Result<[User], Error>) {
+        print("Presenter received result from interactor")
+        
         switch result {
         case .success(let users):
-            view?.update(with: users)
+            print("Presenter processing \(users.count) users")
+            // Make sure we have a view before trying to update it
+            guard let view = view else {
+                print("ERROR: View is nil in presenter")
+                return
+            }
+            view.update(with: users)
             
         case .failure(let error):
-            print("Decoding error: \(error)")  // For debugging
-            view?.update(with: "Failed to decode data: \(error.localizedDescription)")
+            print("Presenter processing error: \(error.localizedDescription)")
+            guard let view = view else {
+                print("ERROR: View is nil in presenter")
+                return
+            }
+            view.update(with: "Failed to fetch users: \(error.localizedDescription)")
         }
     }
-    
-    
 }

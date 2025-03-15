@@ -12,6 +12,7 @@ enum FetchError: Error {
     case decodingError
     case failed
 }
+
 protocol AnyInteractor {
     var presenter: AnyPresenter? { get set }
     
@@ -22,11 +23,20 @@ class UserInteractor: AnyInteractor {
     var presenter: (any AnyPresenter)?
     
     func getUSers() {
-        print("Fetching users...")
-        guard let url = URL(string: "https://jsonplaceholder.typicode.com/users") else { return }
-        let task = URLSession.shared.dataTask(with: url) { (data, _, error) in
-            guard let data = data, error == nil else {
-                print("Failed to fetch users.")
+        guard let url = URL(string: "https://jsonplaceholder.typicode.com/users") else { 
+            self.presenter?.interactorDidfetchUsers(with: .failure(FetchError.failed))
+            return 
+        }
+        
+        let task = URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
+            guard let self = self else { return }
+            
+            if error != nil {
+                self.presenter?.interactorDidfetchUsers(with: .failure(FetchError.networkError))
+                return
+            }
+            
+            guard let data = data else {
                 self.presenter?.interactorDidfetchUsers(with: .failure(FetchError.failed))
                 return
             }

@@ -7,30 +7,45 @@
 
 import Foundation
 
+// Updated User model to match the JSONPlaceholder API response format
 struct User: Codable, Identifiable, Hashable {
-    let id: UUID
+    let id: Int
     let name: String
+    let username: String
+    let email: String
     
-    enum CodingKeys: String, CodingKey {
-        case name
-        case id
+    // Optional properties from the API that we might want later
+    let address: Address?
+    let phone: String?
+    let website: String?
+    let company: Company?
+    
+    // For Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
     
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
-        
-        // Handle ID from API or generate new one if not present
-        if let idString = try? container.decode(String.self, forKey: .id),
-           let uuid = UUID(uuidString: idString) {
-            id = uuid
-        } else {
-            id = UUID()
-        }
+    static func == (lhs: User, rhs: User) -> Bool {
+        return lhs.id == rhs.id
     }
-    
-    init(id: UUID = UUID(), name: String) {
-        self.id = id
-        self.name = name
-    }
+}
+
+// Supporting structures to match the API response
+struct Address: Codable, Hashable {
+    let street: String
+    let suite: String
+    let city: String
+    let zipcode: String
+    let geo: Geo?
+}
+
+struct Geo: Codable, Hashable {
+    let lat: String
+    let lng: String
+}
+
+struct Company: Codable, Hashable {
+    let name: String
+    let catchPhrase: String
+    let bs: String
 }
